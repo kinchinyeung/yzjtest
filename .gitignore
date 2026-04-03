@@ -1,0 +1,17 @@
+# Local data files
+localStorage/
+*.local
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

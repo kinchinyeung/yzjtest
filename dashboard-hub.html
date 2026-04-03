@@ -190,6 +190,11 @@
             display: inline-block;
         }
 
+        .dashboard-item .login-status.auto-login {
+            background: #8b5cf6;
+            color: white;
+        }
+
         .dashboard-item .login-status.need-login {
             background: #f59e0b;
             color: white;
@@ -548,6 +553,45 @@
             cursor: pointer;
         }
 
+        /* Login mode selection */
+        .login-mode-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .login-mode-option {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .login-mode-option:hover {
+            border-color: #475569;
+        }
+
+        .login-mode-option.selected {
+            border-color: #3b82f6;
+            background: #1e3a5f;
+        }
+
+        .login-mode-option .mode-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .login-mode-option .mode-desc {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
         .credentials-section {
             background: #0f172a;
             border: 1px solid #334155;
@@ -563,6 +607,24 @@
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .auto-login-info {
+            background: #8b5cf6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .auto-login-info .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .auto-login-info .text {
+            font-size: 14px;
+            color: white;
         }
 
         .modal-footer {
@@ -705,7 +767,7 @@
 
         /* Warning for empty credentials */
         .warning-banner {
-            background: #f59e0b;
+            background: #8b5cf6;
             color: white;
             padding: 8px 15px;
             font-size: 13px;
@@ -727,6 +789,10 @@
             .iframe-wrapper {
                 min-width: 100%;
                 height: 50%;
+            }
+
+            .login-mode-selector {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -757,11 +823,12 @@
             </select>
         </div>
         <div class="filter-group">
-            <label>登录状态:</label>
+            <label>登录方式:</label>
             <select id="loginFilter" onchange="applyFilters()">
                 <option value="">全部</option>
-                <option value="yes">需要登录</option>
-                <option value="no">无需登录</option>
+                <option value="auto">浏览器自动登录</option>
+                <option value="manual">手动输入密码</option>
+                <option value="none">无需登录</option>
             </select>
         </div>
         <div class="filter-group">
@@ -848,12 +915,42 @@
                     <label>描述</label>
                     <textarea id="dashDesc" placeholder="简要描述这个 Dashboard 的用途..."></textarea>
                 </div>
-                <div class="form-group form-group-inline">
-                    <input type="checkbox" id="dashNeedLogin" onchange="toggleCredentialsSection()">
-                    <label for="dashNeedLogin">需要登录 (保存登录凭证)</label>
+
+                <!-- Login Mode Selection -->
+                <div class="form-group">
+                    <label>登录方式</label>
+                    <div class="login-mode-selector">
+                        <div class="login-mode-option selected" data-mode="auto" onclick="selectLoginMode('auto')">
+                            <div class="mode-title">
+                                <span>🌐</span> 浏览器自动登录
+                            </div>
+                            <div class="mode-desc">使用 Edge 已登录的账户，无需保存密码</div>
+                        </div>
+                        <div class="login-mode-option" data-mode="manual" onclick="selectLoginMode('manual')">
+                            <div class="mode-title">
+                                <span>🔑</span> 手动输入密码
+                            </div>
+                            <div class="mode-desc">保存用户名和密码到本地</div>
+                        </div>
+                        <div class="login-mode-option" data-mode="none" onclick="selectLoginMode('none')">
+                            <div class="mode-title">
+                                <span>🔓</span> 无需登录
+                            </div>
+                            <div class="mode-desc">公开访问的网站</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="dashLoginMode" value="auto">
                 </div>
+
+                <!-- Auto login info -->
+                <div class="auto-login-info" id="autoLoginInfo">
+                    <div class="icon">✅</div>
+                    <div class="text">将使用 Edge 浏览器的已登录会话访问此网站</div>
+                </div>
+
+                <!-- Manual credentials section -->
                 <div class="credentials-section" id="credentialsSection" style="display: none;">
-                    <h4>🔐 登录凭证 (可选保存)</h4>
+                    <h4>🔐 登录凭证 (保存在本地)</h4>
                     <div class="form-group">
                         <label>用户名 / 邮箱</label>
                         <input type="text" id="dashUsername" placeholder="保存后可直接填入">
@@ -870,6 +967,7 @@
                         <textarea id="dashLoginNote" placeholder="如: 需要手机验证码、登录后选择公司等..."></textarea>
                     </div>
                 </div>
+
                 <div class="form-group">
                     <label>分类</label>
                     <select id="dashCategory">
@@ -952,11 +1050,17 @@
             const saved = localStorage.getItem('dashboardAggregator');
             if (saved) {
                 dashboards = JSON.parse(saved);
+                // Migrate old data format
                 dashboards.forEach(d => {
+                    if (d.needLogin !== undefined && d.loginMode === undefined) {
+                        // Old format: convert to new format
+                        d.loginMode = d.needLogin ? 'manual' : 'none';
+                    }
                     if (d.tags) {
                         d.tags.forEach(t => allTags.add(t));
                     }
                 });
+                saveData();
             }
         }
 
@@ -984,22 +1088,20 @@
                 filtered = filtered.filter(d => d.tags && d.tags.includes(selectedTag));
             }
 
-            if (loginFilter === 'yes') {
-                filtered = filtered.filter(d => d.needLogin);
-            } else if (loginFilter === 'no') {
-                filtered = filtered.filter(d => !d.needLogin);
+            if (loginFilter) {
+                filtered = filtered.filter(d => d.loginMode === loginFilter);
             }
 
             container.innerHTML = filtered.map(d => `
                 <div class="dashboard-item ${activeTabs.includes(d.id) ? 'active' : ''}" 
                      onclick="openDashboard('${d.id}')">
                     <div class="name">
-                        ${d.needLogin ? '<span class="lock-icon" title="需要登录">🔒</span>' : '<span class="lock-icon" title="无需登录">🔓</span>'}
+                        ${getLoginIcon(d.loginMode)}
                         ${escapeHtml(d.name)}
                     </div>
                     <div class="url">${escapeHtml(d.url)}</div>
-                    <span class="login-status ${d.needLogin ? 'need-login' : 'no-login'}">
-                        ${d.needLogin ? '需要登录' : '无需登录'}
+                    <span class="login-status ${getLoginStatusClass(d.loginMode)}">
+                        ${getLoginStatusText(d.loginMode)}
                     </span>
                     ${d.tags && d.tags.length ? `
                         <div class="tags">
@@ -1012,6 +1114,30 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        function getLoginIcon(mode) {
+            switch(mode) {
+                case 'auto': return '<span class="lock-icon" title="浏览器自动登录">🌐</span>';
+                case 'manual': return '<span class="lock-icon" title="手动输入密码">🔑</span>';
+                default: return '<span class="lock-icon" title="无需登录">🔓</span>';
+            }
+        }
+
+        function getLoginStatusClass(mode) {
+            switch(mode) {
+                case 'auto': return 'auto-login';
+                case 'manual': return 'need-login';
+                default: return 'no-login';
+            }
+        }
+
+        function getLoginStatusText(mode) {
+            switch(mode) {
+                case 'auto': return '浏览器自动登录';
+                case 'manual': return '需要登录';
+                default: return '无需登录';
+            }
         }
 
         // Update tag filter dropdown
@@ -1051,7 +1177,7 @@
             renderIframes();
             
             // Show login helper if needed
-            if (dashboard.needLogin) {
+            if (dashboard.loginMode === 'manual') {
                 showLoginHelper(dashboard.id);
             }
         }
@@ -1171,7 +1297,7 @@
                 if (!d) return '';
                 return `
                     <div class="tab ${activeTabs.indexOf(id) === activeTabs.length - 1 ? 'active' : ''}" onclick="switchTab('${d.id}')">
-                        ${d.needLogin ? '<span class="lock-icon">🔒</span>' : ''}
+                        ${getLoginIcon(d.loginMode)}
                         ${escapeHtml(d.name)}
                         <span class="close-btn" onclick="event.stopPropagation(); closeTab('${d.id}')">&times;</span>
                     </div>
@@ -1203,21 +1329,26 @@
             container.innerHTML = activeTabs.map(id => {
                 const d = dashboards.find(d => d.id === id);
                 if (!d) return '';
-                const showHelper = d.needLogin && currentLoginDashboard?.id === d.id;
+                const showHelper = d.loginMode === 'manual' && currentLoginDashboard?.id === d.id;
                 return `
                     <div class="iframe-wrapper" id="frame-${id}">
                         ${showHelper ? `
+                            <div class="warning-banner" style="background: #f59e0b;">
+                                🔑 此页面需要手动登录，请使用上方「登录助手」填入凭证
+                            </div>
+                        ` : ''}
+                        ${d.loginMode === 'auto' ? `
                             <div class="warning-banner">
-                                🔐 此页面需要登录，请使用上方「登录助手」填入凭证
+                                🌐 使用浏览器自动登录 - 请确保已在 Edge 中登录此网站
                             </div>
                         ` : ''}
                         <div class="iframe-header">
                             <span class="title">
-                                ${d.needLogin ? '<span>🔒</span>' : '<span>🔓</span>'}
+                                ${getLoginIcon(d.loginMode)}
                                 ${escapeHtml(d.name)}
                             </span>
                             <div class="actions">
-                                ${d.needLogin ? `<button class="btn-login" onclick="showLoginHelper('${d.id}')">登录助手</button>` : ''}
+                                ${d.loginMode === 'manual' ? `<button class="btn-login" onclick="showLoginHelper('${d.id}')">登录助手</button>` : ''}
                                 <button class="btn-refresh" onclick="refreshIframe('${id}')">刷新</button>
                                 <button class="btn-fullscreen" onclick="openFullscreen('${id}')">全屏</button>
                             </div>
@@ -1258,9 +1389,9 @@
 
             document.getElementById('fullscreenTitle').textContent = dashboard.name;
             document.getElementById('fullscreenIframe').src = dashboard.url;
-            document.getElementById('fullscreenLoginBtn').style.display = dashboard.needLogin ? 'inline-block' : 'none';
+            document.getElementById('fullscreenLoginBtn').style.display = dashboard.loginMode === 'manual' ? 'inline-block' : 'none';
             
-            if (dashboard.needLogin) {
+            if (dashboard.loginMode === 'manual') {
                 document.getElementById('fsHelperUsername').value = dashboard.username || '';
                 document.getElementById('fsHelperPassword').value = dashboard.password || '';
             }
@@ -1311,11 +1442,11 @@
             document.getElementById('dashUrl').value = '';
             document.getElementById('dashDesc').value = '';
             document.getElementById('dashCategory').value = 'general';
-            document.getElementById('dashNeedLogin').checked = false;
+            document.getElementById('dashLoginMode').value = 'auto';
             document.getElementById('dashUsername').value = '';
             document.getElementById('dashPassword').value = '';
             document.getElementById('dashLoginNote').value = '';
-            document.getElementById('credentialsSection').style.display = 'none';
+            selectLoginMode('auto');
             currentTags = [];
             renderTagInput();
             document.getElementById('addModal').style.display = 'flex';
@@ -1331,11 +1462,10 @@
             document.getElementById('dashUrl').value = dashboard.url;
             document.getElementById('dashDesc').value = dashboard.desc || '';
             document.getElementById('dashCategory').value = dashboard.category || 'general';
-            document.getElementById('dashNeedLogin').checked = dashboard.needLogin || false;
             document.getElementById('dashUsername').value = dashboard.username || '';
             document.getElementById('dashPassword').value = dashboard.password || '';
             document.getElementById('dashLoginNote').value = dashboard.loginNote || '';
-            document.getElementById('credentialsSection').style.display = dashboard.needLogin ? 'block' : 'none';
+            selectLoginMode(dashboard.loginMode || 'auto');
             currentTags = dashboard.tags || [];
             renderTagInput();
             document.getElementById('addModal').style.display = 'flex';
@@ -1345,9 +1475,31 @@
             document.getElementById('addModal').style.display = 'none';
         }
 
-        function toggleCredentialsSection() {
-            const show = document.getElementById('dashNeedLogin').checked;
-            document.getElementById('credentialsSection').style.display = show ? 'block' : 'none';
+        // Login mode selection
+        function selectLoginMode(mode) {
+            document.getElementById('dashLoginMode').value = mode;
+            document.querySelectorAll('.login-mode-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.mode === mode);
+            });
+
+            // Show/hide relevant sections
+            const autoInfo = document.getElementById('autoLoginInfo');
+            const credSection = document.getElementById('credentialsSection');
+
+            switch(mode) {
+                case 'auto':
+                    autoInfo.style.display = 'block';
+                    credSection.style.display = 'none';
+                    break;
+                case 'manual':
+                    autoInfo.style.display = 'none';
+                    credSection.style.display = 'block';
+                    break;
+                case 'none':
+                    autoInfo.style.display = 'none';
+                    credSection.style.display = 'none';
+                    break;
+            }
         }
 
         // Password visibility toggle
@@ -1391,7 +1543,7 @@
             const url = document.getElementById('dashUrl').value.trim();
             const desc = document.getElementById('dashDesc').value.trim();
             const category = document.getElementById('dashCategory').value;
-            const needLogin = document.getElementById('dashNeedLogin').checked;
+            const loginMode = document.getElementById('dashLoginMode').value;
             const username = document.getElementById('dashUsername').value.trim();
             const password = document.getElementById('dashPassword').value;
             const loginNote = document.getElementById('dashLoginNote').value.trim();
@@ -1413,10 +1565,10 @@
                 url,
                 desc,
                 category,
-                needLogin,
-                username: needLogin ? username : '',
-                password: needLogin ? password : '',
-                loginNote: needLogin ? loginNote : '',
+                loginMode,
+                username: loginMode === 'manual' ? username : '',
+                password: loginMode === 'manual' ? password : '',
+                loginNote: loginMode === 'manual' ? loginNote : '',
                 tags: [...currentTags],
                 createdAt: editId ? dashboards.find(d => d.id === editId)?.createdAt : Date.now()
             };
@@ -1502,7 +1654,7 @@
                 url,
                 desc: '',
                 category: 'general',
-                needLogin: false,
+                loginMode: 'auto', // Default to browser auto-login
                 username: '',
                 password: '',
                 loginNote: '',
@@ -1515,6 +1667,7 @@
             renderDashboardList();
             updateDashboardCount();
             input.value = '';
+            showNotification(`已添加: ${name} (浏览器自动登录)`);
         }
 
         // Notification

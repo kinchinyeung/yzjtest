@@ -1,0 +1,37 @@
+import base64
+
+# 原始文件路径
+input_file = r'C:\Users\Administrator.PC-20220322XJFU\Desktop\python\0602.txt'
+# 输出的 Base64 文本文件路径
+output_file = r'C:\Users\Administrator.PC-20220322XJFU\Desktop\python\0602_base64.txt'
+
+with open(input_file, 'rb') as f:
+    data = f.read()
+
+# 转换为 Base64 编码的文本
+encoded_data = base64.b64encode(data).decode('utf-8')
+
+with open(output_file, 'w', encoding='utf-8') as f:
+    f.write(encoded_data)
+
+print("已成功转为 Base64 并保存为文本文件。")
+
+
+
+import base64
+
+# Base64 编码的文本文件路径
+input_file = r'C:\Path\To\Your\0602_base64.txt'
+# 输出还原后的文件路径
+output_file = r'C:\Path\To\Output\0602_restored.txt'
+
+with open(input_file, 'r', encoding='utf-8') as f:
+    encoded_data = f.read()
+
+# 解码并写入原始数据
+data = base64.b64decode(encoded_data)
+
+with open(output_file, 'wb') as f:
+    f.write(data)
+
+print("已成功从 Base64 文本还原回原始文件。")
